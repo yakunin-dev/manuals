@@ -41,3 +41,8 @@
 |	CLOSE_WAIT	|	12 часов	|
 |	LAST_ACK	|	30 секунд	|
 |	LISTEN		|	2 минуты	|
+
+| First Header  | Second Header |
+| ------------- | ------------- |
+| Content Cell  | Content Cell  |
+| Content Cell  | Content Cell  |
