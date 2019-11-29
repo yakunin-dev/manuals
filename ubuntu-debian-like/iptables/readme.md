@@ -45,3 +45,47 @@
 | LISTEN | 2 минуты |
 
 
+### Примеры
+
+**Паранойя** Лучшим способом начать работу с iptables это установить параметры фильтра на запрещающее все. И разрешать по мере необходимости те порты и сервисы которые необходимы в работе. Команда iptables -L -v -n покажет текущее состояние цепочек и правил.
+Простая конфигурация:
+
+```
+#!/bin/sh
+IPT="/sbin/iptables"
+
+# Сбрасываем все установелнные до начала работы правила, цепочки и очищаем таблицу NAT
+
+$IPT -F
+$IPT -X
+$IPT -t nat -F
+$IPT -t nat -X
+$IPT -t mangle -F
+$IPT -t mangle -X
+
+# Задаем политики по-умолчанию. Изначально все запрещено, разрешаем только то что необходимо. 
+$IPT -P INPUT DROP
+$IPT -P OUTPUT DROP
+$IPT -P FORWARD DROP
+
+# Зазрешаем трафик на петлевом интерфейсе.
+$IPT -A INPUT -i lo -s 127.0.0.1 -d 127.0.0.1 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Разрешаем подлючаться к хосту по SSH
+$IPT -A INPUT -p tcp --dport 22 -j ACCEPT
+
+# Разрешаем все виды эхо-запросов, в будущем лучше ограничить данный параметр только необходимыми пакетами.
+$IPT -A INPUT -p icmp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+# iptables -A INPUT -p icmp --icmp-type 8 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Разрешаем все уже установленные соединения, разрешаются только установленные не новые.
+$IPT -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Разрешаем DNS запросы
+$IPT -A INPUT -p udp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+$IPT -A INPUT -p tcp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+
+# Разрешаем все исходящие от нас соединения.
+$IPT -A OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+```
