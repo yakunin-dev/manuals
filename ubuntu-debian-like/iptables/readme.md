@@ -101,5 +101,68 @@ $IPT -A OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 ```nano /etc/sysctl.conf```
 
 раскоменнтировав там или добавив если её нет строку: ```net.ipv4.ip_forward=1```. 
-Применяем текущие состояния можно командой: ```sysctl -p```
+Применяем текущие состояния можно командой: ```sysctl -w net.ipv4.ip.forward=1``` и проверяем состояние: ```sysctl -p```
 
+
+Создаем конфигурацию iptables.
+
+
+```bash
+
+#!/bin/sh
+
+IPT="/sbin/iptables"
+
+# Объявляем все сетевые интерфейсы (в вашей системе это могу быть другие интерфейсы)
+
+IF_EXT="eth0"
+IF_INT="eth1"
+
+# Задаем переменные для удобаства.
+
+EXT_IP="77.88.8.8"
+INT_NET="192.168.0.0/24"
+
+# Сбрасываем все установелнные до начала работы правила, цепочки и очищаем таблицу NAT
+
+$IPT -F
+$IPT -X
+$IPT -t nat -F
+$IPT -t nat -X
+$IPT -t mangle -F
+$IPT -t mangle -X
+
+# Задаем политики по-умолчанию. Изначально все запрещено, разрешаем только то что необходимо. 
+$IPT -P INPUT DROP
+$IPT -P OUTPUT DROP
+$IPT -P FORWARD DROP
+
+# Зазрешаем трафик на петлевом интерфейсе.
+$IPT -A INPUT -i lo -s 127.0.0.1 -d 127.0.0.1 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Разрешаем подлючаться к хосту по SSH
+$IPT -A INPUT -p tcp --dport 22 -j ACCEPT
+
+# Разрешаем все виды эхо-запросов, в будущем лучше ограничить данный параметр только необходимыми пакетами.
+$IPT -A INPUT -p icmp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+# iptables -A INPUT -p icmp --icmp-type 8 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Разрешаем все уже установленные соединения, разрешаются только установленные не новые.
+$IPT -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Разрешаем DNS запросы
+$IPT -A INPUT -p udp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+$IPT -A INPUT -p tcp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+
+# Разрешаем все пакеты внтури локальной сети
+$IPT -A INPUT -i $IF_INT -s $INT_NET -d $INT_NET -p all -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Разрезаем весь трафик перенаправленный по NAT
+$IPT -A FORWARD -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Включаем трансляцию NAT для адресов локальной сети.
+$IPT -t nat -A POSTROUTING -o $IF_EXT -s $INT_NET -j MASQUERADE
+
+# Разрешаем все исходящие от нас соединения.
+$IPT -A OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+````
